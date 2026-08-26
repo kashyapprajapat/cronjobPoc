@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CronManager – Live Scheduler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=2" />
+  <script>
+    // Kill any stale service workers from previous apps on this port
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => { r.unregister(); console.log('[SW] Unregistered stale service worker:', r.scope); });
+        if (regs.length > 0) {
+          console.log('[SW] Cleared ' + regs.length + ' service worker(s). Reloading...');
+          caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload());
+        }
+      });
+    }
+  </script>
+</head>
+<body>
+
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="hdr">
+    <div class="hdr-inner">
+
+      <div class="logo">
+        <div class="logo-ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <span>CronManager</span>
+        <span class="live-chip" id="conn-badge">⬤ CONNECTING</span>
+      </div>
+
+      <div class="clock-wrap">
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="clock-lbl">System Clock (IST)</div>
+      </div>
+
+      <div class="hdr-pills">
+        <div class="pill pill-green"><span class="pdot green"></span> <span id="h-en">8</span> Running</div>
+        <div class="pill pill-red"><span class="pdot red"></span> <span id="h-dis">2</span> Stopped</div>
+        <div class="pill"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> <span id="h-exec">0</span> Executions</div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ═══ MAIN 2-COLUMN ═══ -->
+  <main class="main">
+
+    <!-- LEFT – job cards -->
+    <section class="left-panel">
+      <div class="panel-top">
+        <div>
+          <h1 class="panel-heading">Scheduled Jobs</h1>
+          <p class="panel-sub">Real cron jobs running via <span class="accent">node-cron</span></p>
+        </div>
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-f="all">All <b id="fc-all">10</b></button>
+          <button class="tab" data-f="enabled">Running <b id="fc-run">8</b></button>
+          <button class="tab" data-f="disabled">Stopped <b id="fc-stop">2</b></button>
+        </div>
+      </div>
+
+      <div class="cards" id="cards">
+        <!-- rendered by JS -->
+      </div>
+    </section>
+
+    <!-- RIGHT – live terminal feed -->
+    <section class="right-panel">
+
+      <div class="feed-hdr">
+        <div class="feed-hdr-left">
+          <span class="live-badge"><span class="ldot"></span>LIVE</span>
+          <span class="feed-title">Execution Log</span>
+        </div>
+        <div class="feed-hdr-right">
+          <span class="run-badge" id="run-badge">0 runs</span>
+          <button class="clr-btn" id="clr-btn">Clear</button>
+        </div>
+      </div>
+
+      <!-- Terminal window -->
+      <div class="terminal" id="terminal">
+        <div class="term-bar">
+          <div class="term-dots"><span></span><span></span><span></span></div>
+          <span class="term-label">node-cron execution log</span>
+          <span class="term-ts" id="term-ts">—</span>
+        </div>
+        <div class="term-body" id="term-body">
+          <div class="term-idle" id="term-idle">
+            <div style="font-size:2rem">⚡</div>
+            <div class="tid-title">CronManager is Running</div>
+            <div class="tid-sub">node-cron has scheduled all 8 enabled jobs.<br>Execution logs will appear here automatically…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="sn" id="st-total">0</div>
+          <div class="sl">Total Runs</div>
+        </div>
+        <div class="stat-box mid">
+          <div class="sn green" id="st-active">8</div>
+          <div class="sl">Active Jobs</div>
+        </div>
+        <div class="stat-box">
+          <div class="sn accent mono" id="st-up">00:00</div>
+          <div class="sl">Session</div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ═══ CONFIRM MODAL ═══ -->
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modal">
+      <div class="modal-glow" id="mglow"></div>
+      <div class="modal-emoji" id="memoji">▶</div>
+      <h2 class="modal-title" id="mtitle">Enable Job?</h2>
+      <div class="modal-chip" id="mchip">job-name</div>
+      <p class="modal-desc" id="mdesc">Description</p>
+      <div class="modal-cron">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <code id="mcron">* * * * * *</code>
+        <span id="mclbl">Every 10 seconds</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-no"  id="btn-no">Cancel</button>
+        <button class="btn-yes" id="btn-yes">Enable Job</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TOAST ═══ -->
+  <div class="toast" id="toast">
+    <div class="toast-ico" id="ticon">✓</div>
+    <div>
+      <div class="toast-title" id="ttitle">Done</div>
+      <div class="toast-sub"   id="tsub">Action completed</div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2"></script>
+</body>
+</html>
