@@ -314,6 +314,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Docs → serve the documentation page
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'docs.html'));
+});
+
 // SSE – real-time event stream
 app.get('/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
